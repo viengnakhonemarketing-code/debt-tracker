@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ລະບົບບັນທຶກໜີ້ລູກຄ້າ</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.development.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;500;600;700&display=swap');
+        body { font-family: 'Noto Sans Lao', sans-serif; }
+        .summary-card { transition: transform 0.2s; }
+        .summary-card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { 
+            Plus, Search, Users, DollarSign, Calendar, User, Phone, Edit2, 
+            Trash2, LogOut, UserCheck, History, CreditCard, FileText, UserPlus,
+            ArrowLeft, Save, X
+        } = LucideReact;
+
+        const CustomerDebtTracker = () => {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [activeTab, setActiveTab] = useState('customers');
+            const [customers, setCustomers] = useState([]);
+            const [debtRecords, setDebtRecords] = useState([]);
+            const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
+            const [showAddDebtForm, setShowAddDebtForm] = useState(false);
+            const [showPaymentForm, setShowPaymentForm] = useState(false);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [editingCustomer, setEditingCustomer] = useState(null);
+            const [selectedDebtRecord, setSelectedDebtRecord] = useState(null);
+            const [showPaymentHistory, setShowPaymentHistory] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+            const [customerForm, setCustomerForm] = useState({
+                customerCode: '', customerName: '', phone: '', address: '', notes: ''
+            });
+            const [debtForm, setDebtForm] = useState({
+                customerId: '', debtAmount: '', date: new Date().toISOString().split('T')[0], description: '', notes: ''
+            });
+            const [paymentForm, setPaymentForm] = useState({
+                amount: '', date: new Date().toISOString().split('T')[0], notes: ''
+            });
+
+            const users = {
+                admin: { username: 'admin', password: 'admin123', role: 'admin', name: 'ຜູ້ດູແລລະບົບ' },
+                viewer: { username: 'viewer', password: 'viewer123', role: 'viewer', name: 'ພະນັກງານເບິ່ງຂໍ້ມູນ' }
+            };
+
+            // 加载示例数据
+            useEffect(() => {
+                const loadSampleData = () => {
+                    const sampleCustomers = [
+                        { id: 1, customerCode: 'C001', customerName: 'ນາງ ສົມຈິດ ພົງສະຫວັນ', phone: '020-5555-1234', address: 'ບ້ານ ນາໂພ', notes: 'ລູກຄ້າປົກກະຕິ' },
+                        { id: 2, customerCode: 'C002', customerName: 'ທ້າວ ບຸນມີ ວົງໄຊ', phone: '030-7777-5678', address: 'ບ້ານ ໂພນທອງ', notes: 'ລູກຄ້າເກົ່າ' }
+                    ];
+
+                    const sampleDebtRecords = [
+                        {
+                            id: 1, customerId: 1, debtAmount: 250000, paidAmount: 50000, remainingDebt: 200000,
+                            date: '2024-08-25', description: 'ຊື້ເຄື່ອງໃຊ້ໄຟຟ້າ', notes: '', status: 'unpaid',
+                            payments: [{ id: 1, amount: 50000, date: '2024-08-28', notes: 'ຊຳລະງວດທຳອິດ' }]
+                        },
+                        {
+                            id: 2, customerId: 1, debtAmount: 100000, paidAmount: 0, remainingDebt: 100000,
+                            date: '2024-08-30', description: 'ຊື້ເສື້ອຜ້າ', notes: '', status: 'unpaid', payments: []
+                        }
+                    ];
+
+                    setCustomers(sampleCustomers);
+                    setDebtRecords(sampleDebtRecords);
+                    setLoading(false);
+                };
+
+                // 模拟数据加载延迟
+                setTimeout(loadSampleData, 1000);
+            }, []);
+
+            const handleLogin = () => {
+                const user = Object.values(users).find(u =>
+                    u.username === loginForm.username && u.password === loginForm.password
+                );
+                if (user) {
+                    setCurrentUser(user);
+                    setLoginForm({ username: '', password: '' });
+                } else {
+                    alert('ຊື່ຜູ້ໃຊ້ງານ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ!');
+                }
+            };
+
+            const handleLogout = () => {
+                setCurrentUser(null);
+                setActiveTab('customers');
+            };
+
+            const handleAddCustomer = () => {
+                if (!customerForm.customerCode || !customerForm.customerName) {
+                    alert('ກະລຸນາຕື່ມລະຫັດແລະຊື່ລູກຄ້າ');
+                    return;
+                }
+                const newCustomer = {
+                    id: editingCustomer ? editingCustomer.id : Date.now(),
+                    ...customerForm
+                };
+                if (editingCustomer) {
+                    setCustomers(customers.map(c => c.id === editingCustomer.id ? newCustomer : c));
+                    setEditingCustomer(null);
+                } else {
+                    setCustomers([...customers, newCustomer]);
+                }
+                setCustomerForm({ customerCode: '', customerName: '', phone: '', address: '', notes: '' });
+                setShowAddCustomerForm(false);
+            };
+
+            const handleAddDebt = () => {
+                if (!debtForm.customerId || !debtForm.debtAmount) {
+                    alert('ກະລຸນາເລືອກລູກຄ້າແລະລະບຸຈຳນວນໜີ້');
+                    return;
+                }
+                const debtAmount = parseFloat(debtForm.debtAmount);
+                const newDebtRecord = {
+                    id: Date.now(), 
+                    ...debtForm, 
+                    customerId: parseInt(debtForm.customerId),
+                    debtAmount: debtAmount, 
+                    paidAmount: 0, 
+                    remainingDebt: debtAmount, 
+                    status: 'unpaid', 
+                    payments: []
+                };
+                setDebtRecords([...debtRecords, newDebtRecord]);
+                setDebtForm({ customerId: '', debtAmount: '', date: new Date().toISOString().split('T')[0], description: '', notes: '' });
+                setShowAddDebtForm(false);
+            };
+
+            const handlePayment = () => {
+                if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
+                    alert('ກະລຸນາລະບຸຍອດເງິນທີ່ຊຳລະ');
+                    return;
+                }
+                const paymentAmount = parseFloat(paymentForm.amount);
+                const debtRecord = selectedDebtRecord;
+                if (paymentAmount > debtRecord.remainingDebt) {
+                    alert('ຍອດຊຳລະບໍ່ສາມາດເກີນຍອດໜີ້ທີ່ເຫຼືອ!');
+                    return;
+                }
+                const newPayment = { id: Date.now(), amount: paymentAmount, date: paymentForm.date, notes: paymentForm.notes };
+                const updatedDebtRecord = {
+                    ...debtRecord,
+                    paidAmount: debtRecord.paidAmount + paymentAmount,
+                    remainingDebt: debtRecord.remainingDebt - paymentAmount,
+                    payments: [...debtRecord.payments, newPayment],
+                    status: debtRecord.remainingDebt - paymentAmount <= 0 ? 'paid' : 'unpaid'
+                };
+                setDebtRecords(debtRecords.map(d => d.id === debtRecord.id ? updatedDebtRecord : d));
+                setPaymentForm({ amount: '', date: new Date().toISOString().split('T')[0], notes: '' });
+                setShowPaymentForm(false);
+                setSelectedDebtRecord(null);
+            };
+
+            const getCustomerName = (customerId) => {
+                const customer = customers.find(c => c.id === customerId);
+                return customer ? customer.customerName : 'ບໍ່ພົບລູກຄ້າ';
+            };
+
+            const getCustomerDebtSummary = (customerId) => {
+                const customerDebts = debtRecords.filter(d => d.customerId === customerId);
+                const totalDebt = customerDebts.reduce((sum, d) => sum + d.debtAmount, 0);
+                const totalPaid = customerDebts.reduce((sum, d) => sum + d.paidAmount, 0);
+                const totalRemaining = customerDebts.reduce((sum, d) => sum + d.remainingDebt, 0);
+                return { totalDebt, totalPaid, totalRemaining, count: customerDebts.length };
+            };
+
+            const filteredCustomers = customers.filter(customer =>
+                customer.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                customer.customerCode.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            const filteredDebtRecords = debtRecords.filter(debt => {
+                const customer = customers.find(c => c.id === debt.customerId);
+                return customer && (
+                    customer.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    customer.customerCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    debt.description.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            });
+
+            const totalDebt = debtRecords.reduce((sum, d) => sum + d.remainingDebt, 0);
+            const totalPaid = debtRecords.reduce((sum, d) => sum + d.paidAmount, 0);
+
+            const formatCurrency = (amount) => {
+                return new Intl.NumberFormat('lo-LA', {
+                    style: 'currency', currency: 'LAK', minimumFractionDigits: 0
+                }).format(amount);
+            };
+
+            if (!currentUser) {
+                return React.createElement('div', { className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4" },
+                    React.createElement('div', { className: "bg-white rounded-xl shadow-lg p-8 w-full max-w-md" },
+                        React.createElement('div', { className: "text-center mb-8" },
+                            React.createElement('h1', { className: "text-3xl font-bold text-gray-800 mb-2" }, "ເຂົ້າສູ່ລະບົບ"),
+                            React.createElement('p', { className: "text-gray-600" }, "ລະບົບບັນທຶກໜີ້ລູກຄ້າ")
+                        ),
+                        React.createElement('div', { className: "space-y-4" },
+                            React.createElement('div', null,
+                                React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ຊື່ຜູ້ໃຊ້ງານ"),
+                                React.createElement('input', {
+                                    type: "text",
+                                    className: "w-full px-3 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500",
+                                    value: loginForm.username,
+                                    onChange: (e) => setLoginForm({...loginForm, username: e.target.value})
+                                })
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ລະຫັດຜ່ານ"),
+                                React.createElement('input', {
+                                    type: "password",
+                                    className: "w-full px-3 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500",
+                                    value: loginForm.password,
+                                    onChange: (e) => setLoginForm({...loginForm, password: e.target.value})
+                                })
+                            ),
+                            React.createElement('button', {
+                                onClick: handleLogin,
+                                className: "w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors"
+                            }, "ເຂົ້າສູ່ລະບົບ")
+                        ),
+                        React.createElement('div', { className: "mt-8 p-4 bg-gray-50 rounded-lg" },
+                            React.createElement('h3', { className: "font-medium text-gray-800 mb-2" }, "ບັນຊີທົດລອງ:"),
+                            React.createElement('div', { className: "text-sm text-gray-600 space-y-1" },
+                                React.createElement('p', null,
+                                    React.createElement('strong', null, "Admin:"), " admin / admin123"
+                                ),
+                                React.createElement('p', null,
+                                    React.createElement('strong', null, "ເບິ່ງຂໍ້ມູນ:"), " viewer / viewer123"
+                                )
+                            )
+                        )
+                    )
+                );
+            }
+
+            if (loading) {
+                return React.createElement('div', { className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center" },
+                    React.createElement('div', { className: "text-center" },
+                        React.createElement('div', { className: "animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" }),
+                        React.createElement('p', { className: "mt-4 text-gray-700" }, "ກຳລັງໂຫລດຂໍ້ມູນ...")
+                    )
+                );
+            }
+
+            return React.createElement('div', { className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4" },
+                React.createElement('div', { className: "max-w-6xl mx-auto" },
+                    React.createElement('div', { className: "bg-white rounded-xl shadow-lg p-6 mb-6" },
+                        React.createElement('div', { className: "flex justify-between items-center mb-6" },
+                            React.createElement('h1', { className: "text-3xl font-bold text-gray-800" }, "ລະບົບບັນທຶກໜີ້ລູກຄ້າ"),
+                            React.createElement('div', { className: "flex items-center gap-4" },
+                                React.createElement('div', { className: "flex items-center gap-2" },
+                                    React.createElement(UserCheck, { className: "w-5 h-5 text-gray-600" }),
+                                    React.createElement('span', { className: "text-sm text-gray-600" }, currentUser.name)
+                                ),
+                                React.createElement('button', {
+                                    onClick: handleLogout,
+                                    className: "bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                                },
+                                    React.createElement(LogOut, { className: "w-4 h-4" }),
+                                    "ອອກ"
+                                )
+                            )
+                        ),
+                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-4 gap-4" },
+                            React.createElement('div', { className: "summary-card bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-lg" },
+                                React.createElement('div', { className: "flex items-center" },
+                                    React.createElement(Users, { className: "w-8 h-8 mr-3" }),
+                                    React.createElement('div', null,
+                                        React.createElement('p', { className: "text-red-100 text-sm" }, "ລູກຄ້າທັງໝົດ"),
+                                        React.createElement('p', { className: "text-2xl font-bold" }, `${customers.length} ຄົນ`)
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { className: "summary-card bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 rounded-lg" },
+                                React.createElement('div', { className: "flex items-center" },
+                                    React.createElement(DollarSign, { className: "w-8 h-8 mr-3" }),
+                                    React.createElement('div', null,
+                                        React.createElement('p', { className: "text-orange-100 text-sm" }, "ໜີ້ທີ່ເຫຼືອ"),
+                                        React.createElement('p', { className: "text-xl font-bold" }, formatCurrency(totalDebt))
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { className: "summary-card bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-lg" },
+                                React.createElement('div', { className: "flex items-center" },
+                                    React.createElement(CreditCard, { className: "w-8 h-8 mr-3" }),
+                                    React.createElement('div', null,
+                                        React.createElement('p', { className: "text-green-100 text-sm" }, "ຊຳລະແລ້ວ"),
+                                        React.createElement('p', { className: "text-xl font-bold" }, formatCurrency(totalPaid))
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { className: "summary-card bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-lg" },
+                                React.createElement('div', { className: "flex items-center" },
+                                    React.createElement(FileText, { className: "w-8 h-8 mr-3" }),
+                                    React.createElement('div', null,
+                                        React.createElement('p', { className: "text-blue-100 text-sm" }, "ບັນທຶກທັງໝົດ"),
+                                        React.createElement('p', { className: "text-xl font-bold" }, `${debtRecords.length} ລາຍການ`)
+                                    )
+                                )
+                            )
+                        )
+                    ),
+
+                    React.createElement('div', { className: "bg-white rounded-xl shadow-lg mb-6" },
+                        React.createElement('div', { className: "flex border-b" },
+                            React.createElement('button', {
+                                onClick: () => setActiveTab('customers'),
+                                className: `px-6 py-4 font-medium transition-colors ${
+                                    activeTab === 'customers' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600 hover:text-gray-800'
+                                }`
+                            },
+                                React.createElement('div', { className: "flex items-center gap-2" },
+                                    React.createElement(UserPlus, { className: "w-5 h-5" }),
+                                    "ຈັດການລູກຄ້າ"
+                                )
+                            ),
+                            React.createElement('button', {
+                                onClick: () => setActiveTab('debts'),
+                                className: `px-6 py-4 font-medium transition-colors ${
+                                    activeTab === 'debts' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600 hover:text-gray-800'
+                                }`
+                            },
+                                React.createElement('div', { className: "flex items-center gap-2" },
+                                    React.createElement(FileText, { className: "w-5 h-5" }),
+                                    "ບັນທຶກໜີ້ສິນ"
+                                )
+                            )
+                        ),
+
+                        React.createElement('div', { className: "p-6" },
+                            React.createElement('div', { className: "flex flex-col md:flex-row gap-4 mb-6" },
+                                React.createElement('div', { className: "flex-1 relative" },
+                                    React.createElement(Search, { className: "absolute left-3 top-3 w-5 h-5 text-gray-400" }),
+                                    React.createElement('input', {
+                                        type: "text",
+                                        placeholder: activeTab === 'customers' ? "ຄົ້ນຫາລູກຄ້າ..." : "ຄົ້ນຫາບັນທຶກໜີ້...",
+                                        className: "w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500",
+                                        value: searchTerm,
+                                        onChange: (e) => setSearchTerm(e.target.value)
+                                    })
+                                ),
+                                currentUser.role === 'admin' && React.createElement('button', {
+                                    onClick: () => {
+                                        if (activeTab === 'customers') {
+                                            setShowAddCustomerForm(true);
+                                            setEditingCustomer(null);
+                                        } else {
+                                            setShowAddDebtForm(true);
+                                        }
+                                    },
+                                    className: "bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
+                                },
+                                    React.createElement(Plus, { className: "w-5 h-5" }),
+                                    activeTab === 'customers' ? 'ເພີ່ມລູກຄ້າ' : 'ບັນທຶກໜີ້ໃໝ່'
+                                )
+                            ),
+
+                            showAddCustomerForm && currentUser.role === 'admin' && activeTab === 'customers' && React.createElement('div', { className: "bg-gray-50 p-6 rounded-lg mb-6" },
+                                React.createElement('h3', { className: "text-xl font-semibold mb-4" },
+                                    editingCustomer ? 'ແກ້ໄຂຂໍ້ມູນລູກຄ້າ' : 'ເພີ່ມລູກຄ້າໃໝ່'
+                                ),
+                                React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ລະຫັດລູກຄ້າ *"),
+                                        React.createElement('input', {
+                                            type: "text",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: customerForm.customerCode,
+                                            onChange: (e) => setCustomerForm({...customerForm, customerCode: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ຊື່ລູກຄ້າ *"),
+                                        React.createElement('input', {
+                                            type: "text",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: customerForm.customerName,
+                                            onChange: (e) => setCustomerForm({...customerForm, customerName: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ເບີໂທ"),
+                                        React.createElement('input', {
+                                            type: "tel",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: customerForm.phone,
+                                            onChange: (e) => setCustomerForm({...customerForm, phone: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ທີ່ຢູ່"),
+                                        React.createElement('input', {
+                                            type: "text",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: customerForm.address,
+                                            onChange: (e) => setCustomerForm({...customerForm, address: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', { className: "md:col-span-2" },
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ໝາຍເຫດ"),
+                                        React.createElement('input', {
+                                            type: "text",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: customerForm.notes,
+                                            onChange: (e) => setCustomerForm({...customerForm, notes: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', { className: "md:col-span-2 flex gap-3" },
+                                        React.createElement('button', {
+                                            onClick: handleAddCustomer,
+                                            className: "bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                                        }, React.createElement(Save, { className: "w-4 h-4" }), editingCustomer ? 'ອັບເດດ' : 'ບັນທຶກ'),
+                                        React.createElement('button', {
+                                            onClick: () => {setShowAddCustomerForm(false); setEditingCustomer(null);},
+                                            className: "bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                                        }, React.createElement(X, { className: "w-4 h-4" }), "ຍົກເລີກ")
+                                    )
+                                )
+                            ),
+
+                            showAddDebtForm && currentUser.role === 'admin' && activeTab === 'debts' && React.createElement('div', { className: "bg-gray-50 p-6 rounded-lg mb-6" },
+                                React.createElement('h3', { className: "text-xl font-semibold mb-4" }, "ບັນທຶກໜີ້ສິນໃໝ່"),
+                                React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ເລືອກລູກຄ້າ *"),
+                                        React.createElement('select', {
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: debtForm.customerId,
+                                            onChange: (e) => setDebtForm({...debtForm, customerId: e.target.value})
+                                        },
+                                            React.createElement('option', { value: "" }, "ເລືອກລູກຄ້າ..."),
+                                            customers.map(customer => 
+                                                React.createElement('option', { key: customer.id, value: customer.id },
+                                                    `${customer.customerCode} - ${customer.customerName}`
+                                                )
+                                            )
+                                        )
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ຈຳນວນໜີ້ (ກີບ) *"),
+                                        React.createElement('input', {
+                                            type: "number",
+                                            min: "0",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: debtForm.debtAmount,
+                                            onChange: (e) => setDebtForm({...debtForm, debtAmount: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ວັນທີ"),
+                                        React.createElement('input', {
+                                            type: "date",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: debtForm.date,
+                                            onChange: (e) => setDebtForm({...debtForm, date: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ລາຍລະອຽດ"),
+                                        React.createElement('input', {
+                                            type: "text",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: debtForm.description,
+                                            onChange: (e) => setDebtForm({...debtForm, description: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', { className: "md:col-span-2" },
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ໝາຍເຫດ"),
+                                        React.createElement('input', {
+                                            type: "text",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500",
+                                            value: debtForm.notes,
+                                            onChange: (e) => setDebtForm({...debtForm, notes: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', { className: "md:col-span-2 flex gap-3" },
+                                        React.createElement('button', {
+                                            onClick: handleAddDebt,
+                                            className: "bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                                        }, React.createElement(Save, { className: "w-4 h-4" }), "ບັນທຶກໜີ້"),
+                                        React.createElement('button', {
+                                            onClick: () => setShowAddDebtForm(false),
+                                            className: "bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                                        }, React.createElement(X, { className: "w-4 h-4" }), "ຍົກເລີກ")
+                                    )
+                                )
+                            ),
+
+                            showPaymentForm && currentUser.role === 'admin' && React.createElement('div', { className: "bg-green-50 p-6 rounded-lg mb-6" },
+                                React.createElement('h3', { className: "text-xl font-semibold mb-4" },
+                                    `ບັນທຶກການຊຳລະ - ${getCustomerName(selectedDebtRecord?.customerId)}`
+                                ),
+                                React.createElement('div', { className: "mb-4 p-3 bg-white rounded border" },
+                                    React.createElement('p', { className: "text-sm" },
+                                        "ໜີ້ທັງໝົດ: ",
+                                        React.createElement('span', { className: "font-semibold text-red-600" }, formatCurrency(selectedDebtRecord?.debtAmount))
+                                    ),
+                                    React.createElement('p', { className: "text-sm" },
+                                        "ຊຳລະແລ້ວ: ",
+                                        React.createElement('span', { className: "font-semibold text-green-600" }, formatCurrency(selectedDebtRecord?.paidAmount))
+                                    ),
+                                    React.createElement('p', { className: "text-sm" },
+                                        "ຄົງເຫຼືອ: ",
+                                        React.createElement('span', { className: "font-semibold text-orange-600" }, formatCurrency(selectedDebtRecord?.remainingDebt))
+                                    )
+                                ),
+                                React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ຈຳນວນເງິນທີ່ຊຳລະ (ກີບ) *"),
+                                        React.createElement('input', {
+                                            type: "number",
+                                            min: "0",
+                                            max: selectedDebtRecord?.remainingDebt,
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500",
+                                            value: paymentForm.amount,
+                                            onChange: (e) => setPaymentForm({...paymentForm, amount: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ວັນທີຊຳລະ"),
+                                        React.createElement('input', {
+                                            type: "date",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500",
+                                            value: paymentForm.date,
+                                            onChange: (e) => setPaymentForm({...paymentForm, date: e.target.value})
+                                        })
+                                    ),
+                                    React.createElement('div', null,
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "ໝາຍເຫດ"),
+                                        React.createElement('input', {
+                                            type: "text",
+                                            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500",
+                                            value: paymentForm.notes,
+                                            onChange: (e) => setPaymentForm({...paymentForm, notes: e.target.value})
+                                        })
+                                    )
+                                ),
+                                React.createElement('div', { className: "mt-4 flex gap-3" },
+                                    React.createElement('button', {
+                                        onClick: handlePayment,
+                                        className: "bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                                    }, React.createElement(Save, { className: "w-4 h-4" }), "ບັນທຶກການຊຳລະ"),
+                                    React.createElement('button', {
+                                        onClick: () => {
+                                            setShowPaymentForm(false);
+                                            setSelectedDebtRecord(null);
+                                        },
+                                        className: "bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                                    }, React.createElement(X, { className: "w-4 h-4" }), "ຍົກເລີກ")
+                                )
+                            ),
+
+                            activeTab === 'customers' && React.createElement('div', null,
+                                React.createElement('h2', { className: "text-2xl font-semibold text-gray-800 mb-4" }, "ລາຍການລູກຄ້າ"),
+                                filteredCustomers.length === 0 ? React.createElement('div', { className: "text-center py-12 text-gray-500" },
+                                    React.createElement(Users, { className: "w-16 h-16 mx-auto mb-4 text-gray-300" }),
+                                    React.createElement('p', { className: "text-lg" }, "ບໍ່ມີຂໍ້ມູນລູກຄ້າ")
+                                ) : React.createElement('div', { className: "grid gap-4" },
+                                    filteredCustomers.map((customer) => {
+                                        const debtSummary = getCustomerDebtSummary(customer.id);
+                                        return React.createElement('div', { key: customer.id, className: "bg-white border rounded-lg p-4" },
+                                            React.createElement('div', { className: "flex justify-between items-start" },
+                                                React.createElement('div', { className: "flex-1" },
+                                                    React.createElement('div', { className: "flex items-center gap-3 mb-2" },
+                                                        React.createElement('span', { className: "bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium" }, customer.customerCode),
+                                                        React.createElement('h3', { className: "text-lg font-semibold text-gray-800" }, customer.customerName)
+                                                    ),
+                                                    currentUser.role === 'admin' && React.createElement('div', { className: "text-sm text-gray-600 space-y-1" },
+                                                        React.createElement('p', null,
+                                                            React.createElement(Phone, { className: "w-4 h-4 inline mr-1" }),
+                                                            customer.phone
+                                                        ),
+                                                        React.createElement('p', null, customer.address),
+                                                        customer.notes && React.createElement('p', null, `ໝາຍເຫດ: ${customer.notes}`)
+                                                    ),
+                                                    React.createElement('div', { className: "mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm" },
+                                                        React.createElement('div', { className: "bg-red-50 p-2 rounded" },
+                                                            React.createElement('p', { className: "text-red-600 font-medium" }, "ໜີ້ທີ່ເຫຼືອ"),
+                                                            React.createElement('p', { className: "text-red-800 font-semibold" }, formatCurrency(debtSummary.totalRemaining))
+                                                        ),
+                                                        React.createElement('div', { className: "bg-green-50 p-2 rounded" },
+                                                            React.createElement('p', { className: "text-green-600 font-medium" }, "ຊຳລະແລ້ວ"),
+                                                            React.createElement('p', { className: "text-green-800 font-semibold" }, formatCurrency(debtSummary.totalPaid))
+                                                        ),
+                                                        React.createElement('div', { className: "bg-blue-50 p-2 rounded" },
+                                                            React.createElement('p', { className: "text-blue-600 font-medium" }, "ໜີ້ທັງໝົດ"),
+                                                            React.createElement('p', { className: "text-blue-800 font-semibold" }, formatCurrency(debtSummary.totalDebt))
+                                                        ),
+                                                        React.createElement('div', { className: "bg-gray-50 p-2 rounded" },
+                                                            React.createElement('p', { className: "text-gray-600 font-medium" }, "ບັນທຶກ"),
+                                                            React.createElement('p', { className: "text-gray-800 font-semibold" }, `${debtSummary.count} ລາຍການ`)
+                                                        )
+                                                    )
+                                                ),
+                                                currentUser.role === 'admin' && React.createElement('div', { className: "flex gap-2 ml-4" },
+                                                    React.createElement('button', {
+                                                        onClick: () => {
+                                                            setCustomerForm({...customer});
+                                                            setEditingCustomer(customer);
+                                                            setShowAddCustomerForm(true);
+                                                        },
+                                                        className: "bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg",
+                                                        title: "ແກ້ໄຂ"
+                                                    }, React.createElement(Edit2, { className: "w-4 h-4" })),
+                                                    React.createElement('button', {
+                                                        onClick: () => {
+                                                            const hasDebts = debtRecords.some(d => d.customerId === customer.id);
+                                                            if (hasDebts) {
+                                                                alert('ບໍ່ສາມາດລຶບລູກຄ້າທີ່ມີປະຫວັດໜີ້ໄດ້');
+                                                                return;
+                                                            }
+                                                            if (window.confirm('ທ່ານແນ່ໃຈບໍ່ທີ່ຕ້ອງການລຶບລູກຄ້ານີ້?')) {
+                                                                setCustomers(customers.filter(c => c.id !== customer.id));
+                                                            }
+                                                        },
+                                                        className: "bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg",
+                                                        title: "ລຶບ"
+                                                    }, React.createElement(Trash2, { className: "w-4 h-4" }))
+                                                )
+                                            )
+                                        );
+                                    })
+                                )
+                            ),
+
+                            activeTab === 'debts' && React.createElement('div', null,
+                                React.createElement('h2', { className: "text-2xl font-semibold text-gray-800 mb-4" }, "ບັນທຶກໜີ້ສິນ"),
+                                filteredDebtRecords.length === 0 ? React.createElement('div', { className: "text-center py-12 text-gray-500" },
+                                    React.createElement(FileText, { className: "w-16 h-16 mx-auto mb-4 text-gray-300" }),
+                                    React.createElement('p', { className: "text-lg" }, "ບໍ່ມີບັນທຶກໜີ້ສິນ")
+                                ) : React.createElement('div', { className: "overflow-x-auto" },
+                                    React.createElement('table', { className: "w-full" },
+                                        React.createElement('thead', null,
+                                            React.createElement('tr', { className: "bg-gray-50" },
+                                                React.createElement('th', { className: "px-4 py-3 text-left text-sm font-medium text-gray-700" }, "ລູກຄ້າ"),
+                                                React.createElement('th', { className: "px-4 py-3 text-left text-sm font-medium text-gray-700" }, "ລາຍລະອຽດ"),
+                                                React.createElement('th', { className: "px-4 py-3 text-left text-sm font-medium text-gray-700" }, "ໜີ້ທັງໝົດ"),
+                                                React.createElement('th', { className: "px-4 py-3 text-left text-sm font-medium text-gray-700" }, "ຊຳລະແລ້ວ"),
+                                                React.createElement('th', { className: "px-4 py-3 text-left text-sm font-medium text-gray-700" }, "ຄົງເຫຼືອ"),
+                                                React.createElement('th', { className: "px-4 py-3 text-left text-sm font-medium text-gray-700" }, "ວັນທີ"),
+                                                React.createElement('th', { className: "px-4 py-3 text-left text-sm font-medium text-gray-700" }, "ສະຖານະ"),
+                                                currentUser.role === 'admin' && React.createElement('th', { className: "px-4 py-3 text-left text-sm font-medium text-gray-700" }, "ການກະທຳ")
+                                            )
+                                        ),
+                                        React.createElement('tbody', { className: "divide-y divide-gray-100" },
+                                            filteredDebtRecords.map((debt) => 
+                                                React.createElement('tr', { key: debt.id, className: "hover:bg-gray-50 transition-colors" },
+                                                    React.createElement('td', { className: "px-4 py-3" },
+                                                        React.createElement('div', { className: "flex items-center gap-2" },
+                                                            React.createElement(User, { className: "w-4 h-4 text-gray-400" }),
+                                                            React.createElement('span', { className: "font-medium" }, getCustomerName(debt.customerId))
+                                                        )
+                                                    ),
+                                                    React.createElement('td', { className: "px-4 py-3 text-sm text-gray-600" }, debt.description),
+                                                    React.createElement('td', { className: "px-4 py-3 text-sm font-semibold text-gray-800" }, formatCurrency(debt.debtAmount)),
+                                                    React.createElement('td', { className: "px-4 py-3 text-sm font-semibold text-green-600" }, formatCurrency(debt.paidAmount)),
+                                                    React.createElement('td', { className: "px-4 py-3 text-sm font-semibold text-red-600" }, formatCurrency(debt.remainingDebt)),
+                                                    React.createElement('td', { className: "px-4 py-3 text-sm text-gray-600" }, new Date(debt.date).toLocaleDateString('lo-LA')),
+                                                    React.createElement('td', { className: "px-4 py-3" },
+                                                        React.createElement('span', { 
+                                                            className: `inline-flex px-2 py-1 text-xs rounded-full font-medium ${
+                                                                debt.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                            }`
+                                                        }, debt.status === 'paid' ? 'ຈ່າຍຄົບແລ້ວ' : 'ຍັງບໍ່ຄົບ')
+                                                    ),
+                                                    currentUser.role === 'admin' && React.createElement('td', { className: "px-4 py-3" },
+                                                        React.createElement('div', { className: "flex gap-2" },
+                                                            React.createElement('button', {
+                                                                onClick: () => setShowPaymentHistory(debt),
+                                                                className: "bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg",
+                                                                title: "ເບິ່ງປະຫວັດການຊຳລະ"
+                                                            }, React.createElement(History, { className: "w-4 h-4" })),
+                                                            debt.remainingDebt > 0 && React.createElement('button', {
+                                                                onClick: () => {
+                                                                    setSelectedDebtRecord(debt);
+                                                                    setShowPaymentForm(true);
+                                                                },
+                                                                className: "bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg",
+                                                                title: "ບັນທຶກການຊຳລະ"
+                                                            }, React.createElement(CreditCard, { className: "w-4 h-4" })),
+                                                            React.createElement('button', {
+                                                                onClick: () => {
+                                                                    if (window.confirm('ທ່ານແນ່ໃຈບໍ່ທີ່ຕ້ອງການລຶບບັນທຶກໜີ້ນີ້?')) {
+                                                                        setDebtRecords(debtRecords.filter(d => d.id !== debt.id));
+                                                                    }
+                                                                },
+                                                                className: "bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg",
+                                                                title: "ລຶບ"
+                                                            }, React.createElement(Trash2, { className: "w-4 h-4" }))
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ),
+
+                    showPaymentHistory && React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" },
+                        React.createElement('div', { className: "bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-96 overflow-y-auto" },
+                            React.createElement('div', { className: "p-6" },
+                                React.createElement('div', { className: "flex justify-between items-center mb-4" },
+                                    React.createElement('h3', { className: "text-xl font-semibold" },
+                                        `ປະຫວັດການຊຳລະ - ${getCustomerName(showPaymentHistory.customerId)}`
+                                    ),
+                                    React.createElement('button', {
+                                        onClick: () => setShowPaymentHistory(null),
+                                        className: "text-gray-500 hover:text-gray-700"
+                                    }, "✕")
+                                ),
+                                React.createElement('div', { className: "grid grid-cols-3 gap-4 mb-6" },
+                                    React.createElement('div', { className: "bg-gray-50 p-3 rounded-lg text-center" },
+                                        React.createElement('p', { className: "text-sm text-gray-600" }, "ໜີ້ທັງໝົດ"),
+                                        React.createElement('p', { className: "text-lg font-semibold text-gray-800" }, formatCurrency(showPaymentHistory.debtAmount))
+                                    ),
+                                    React.createElement('div', { className: "bg-green-50 p-3 rounded-lg text-center" },
+                                        React.createElement('p', { className: "text-sm text-gray-600" }, "ຊຳລະແລ້ວ"),
+                                        React.createElement('p', { className: "text-lg font-semibold text-green-600" }, formatCurrency(showPaymentHistory.paidAmount))
+                                    ),
+                                    React.createElement('div', { className: "bg-red-50 p-3 rounded-lg text-center" },
+                                        React.createElement('p', { className: "text-sm text-gray-600" }, "ຄົງເຫຼືອ"),
+                                        React.createElement('p', { className: "text-lg font-semibold text-red-600" }, formatCurrency(showPaymentHistory.remainingDebt))
+                                    )
+                                ),
+                                React.createElement('div', { className: "space-y-3" },
+                                    React.createElement('h4', { className: "font-medium text-gray-800" }, "ລາຍການການຊຳລະ:"),
+                                    showPaymentHistory.payments.length === 0 ? React.createElement('p', { className: "text-gray-500 text-center py-4" }, "ຍັງບໍ່ມີການຊຳລະ") : 
+                                    showPaymentHistory.payments.map((payment) => 
+                                        React.createElement('div', { key: payment.id, className: "bg-gray-50 p-4 rounded-lg flex justify-between items-center" },
+                                            React.createElement('div', null,
+                                                React.createElement('p', { className: "font-medium text-green-600" }, formatCurrency(payment.amount)),
+                                                React.createElement('p', { className: "text-sm text-gray-600" }, `ວັນທີ: ${new Date(payment.date).toLocaleDateString('lo-LA')}`),
+                                                payment.notes && React.createElement('p', { className: "text-sm text-gray-500" }, `ໝາຍເຫດ: ${payment.notes}`)
+                                            ),
+                                            React.createElement('div', { className: "flex items-center text-green-600" },
+                                                React.createElement(CreditCard, { className: "w-5 h-5" })
+                                            )
+                                        )
+                                    )
+                                ),
+                                React.createElement('div', { className: "mt-6 text-center" },
+                                    React.createElement('button', {
+                                        onClick: () => setShowPaymentHistory(null),
+                                        className: "bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors"
+                                    }, "ປິດ")
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(CustomerDebtTracker));
+    </script>
+</body>
+</html>
